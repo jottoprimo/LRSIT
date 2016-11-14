@@ -8,9 +8,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
-import java.util.Dictionary;
 import java.util.HashMap;
-import java.util.Map;
 
 public class Application implements Runnable {
     Habitat habitat;
@@ -25,6 +23,15 @@ public class Application implements Runnable {
     final String FONT_BASE = "Comic Sans MS";
     final String FONT_VALUE = "Times New Roman";
     Style head, param, value;
+
+    private Timer timer;
+    private JPanel world;
+    private JFrame f;
+    private JButton startSimulationButton, stopSimulationButton;
+    private JLabel timeLabel;
+    private ButtonGroup showTimeSimulationGroup;
+    private JRadioButton showTimeSimulation;
+    private JRadioButton dontShowTimeSimulation;
 
     private void setStyle(JTextPane textPane){
         head = textPane.addStyle(HEAD_STYLE, null);
@@ -55,23 +62,23 @@ public class Application implements Runnable {
     }
 
     public void run() {
-        JFrame f = new JFrame ("Main");
-        JPanel root = new JPanel(f.getContentPane().getLayout());
+        f = new JFrame ("Main");
+        world = new JPanel();
         JPanel panel = new JPanel();
-        JPanel world = new JPanel();
+        panel.setLayout(new BoxLayout(panel,BoxLayout.PAGE_AXIS));
 
+        //world.setLocation(0,0);
+       // world.setBounds(0,0,800,600);
+        world.setMinimumSize(new Dimension(800,600));
+        world.setPreferredSize(new Dimension(800,600));
 
-
-        panel.setLocation(0,0);
-        panel.setSize(800,600);
-        panel.setLayout(null);
-        f.add(panel);
-        JLabel timeLabel = new JLabel("Время: ");
+        world.setLayout(null);
+        timeLabel = new JLabel("Время: ");
         timeLabel.setLocation(0, 0);
        // timeLabel.setMinimumSize(new Dimension(100,100));
         timeLabel.setSize(100,20);
         timeLabel.setBorder(new BevelBorder(1));
-        panel.add(timeLabel);
+        world.add(timeLabel);
 
         habitat = new Habitat(800, 600);
         habitat.setCreteHouseListener(house -> {
@@ -90,13 +97,13 @@ public class Application implements Runnable {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            panel.add(imagePanel);
+            world.add(imagePanel);
             f.repaint();
         });
 
         f.setDefaultCloseOperation (JFrame.EXIT_ON_CLOSE);
 
-        Timer timer = new Timer(1000, new AbstractAction() {
+        timer = new Timer(1000, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 time += 1;
@@ -117,30 +124,12 @@ public class Application implements Runnable {
                 // Нажатие на B
                 if (e.getKeyCode()==66) {
                     timer.start();
-                    panel.removeAll();
-                    panel.add(timeLabel);
+                    world.removeAll();
                     f.repaint();
                 }
                 // Нажатие на E
                 if (e.getKeyCode()==69) {
-                    timer.stop();
-                    JTextPane report = new JTextPane();
-                    setStyle(report);
-                    insertText(report, "Отчет симуляии\n", head);
-                    HashMap<String, Integer> dataReport = habitat.getHousesReport();
-                    report.setSize(600,100);
-                    report.setEditable(false);
-                    report.setBackground(new Color(227, 228, 254));
-                    report.setLocation(100,100);
-                    for (String key: dataReport.keySet()){
-                        insertText(report, key+": ", param);
-                        insertText(report, dataReport.get(key).toString()+"\n", value);
-                    }
-                    insertText(report, "Время: ", param);
-                    insertText(report, String.valueOf(time), value);
-                    panel.add(report);
-                    habitat.ClearList();
-                    time = 0;
+                    stopSimulation();
                 }
 
                 if (e.getKeyCode() == 84){
@@ -153,21 +142,64 @@ public class Application implements Runnable {
 
             }
         });
+        world.setBorder(new BevelBorder(1));
+        f.add(world, BorderLayout.LINE_START);
 
-        f.setSize(800, 600);
-        /*ImagePanel imagePanel = new ImagePanel();
-        imagePanel.setLayout(null);
-        imagePanel.setSize(30,30);
-        try {
-            Image image = ImageIO.read(new File("privateHouse.png"));
-            imagePanel.setImage(image);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        imagePanel.setLocation(10,10);
-        f.add(imagePanel);*/
-        // Показать окно
-        panel.setBorder(new BevelBorder(1));
+        //ControlPanel created
+        startSimulationButton = new JButton("Старт");
+        startSimulationButton.addActionListener(e -> {
+            startSimulation();
+        });
+        stopSimulationButton = new JButton("Стоп");
+        stopSimulationButton.setEnabled(false);
+        stopSimulationButton.addActionListener(e -> {
+            stopSimulation();
+        });
+        showTimeSimulationGroup = new ButtonGroup();
+        showTimeSimulation = new JRadioButton("Показывать время",true);
+        dontShowTimeSimulation = new JRadioButton("Не показывать время");
+        showTimeSimulationGroup.add(showTimeSimulation);
+        showTimeSimulationGroup.add(dontShowTimeSimulation);
+        panel.add(startSimulationButton);
+        panel.add(stopSimulationButton);
+        panel.add(showTimeSimulation);
+        panel.add(dontShowTimeSimulation);
+
+        f.add(panel, BorderLayout.LINE_END);
+
+        f.setSize(1000, 600);
         f.setVisible(true);
+    }
+
+    private void stopSimulation() {
+        timer.stop();
+        JTextPane report = new JTextPane();
+        setStyle(report);
+        insertText(report, "Отчет симуляии\n", head);
+        HashMap<String, Integer> dataReport = habitat.getHousesReport();
+        report.setSize(600,100);
+        report.setEditable(false);
+        report.setBackground(new Color(227, 228, 254));
+        report.setLocation(100,100);
+        for (String key: dataReport.keySet()){
+            insertText(report, key+": ", param);
+            insertText(report, dataReport.get(key).toString()+"\n", value);
+        }
+        insertText(report, "Время: ", param);
+        insertText(report, String.valueOf(time), value);
+        world.add(report);
+        habitat.ClearList();
+        stopSimulationButton.setEnabled(false);
+        startSimulationButton.setEnabled(true);
+        time = 0;
+    }
+
+    private void startSimulation(){
+        timer.start();
+        world.removeAll();
+        startSimulationButton.setEnabled(false);
+        stopSimulationButton.setEnabled(true);
+        world.add(timeLabel);
+        f.repaint();
     }
 }
