@@ -10,7 +10,20 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 
-public class Application implements Runnable {
+public class Application implements Runnable, ActionListener {
+    private final String START_SIMULATION="start simulation";
+    private final String STOP_SIMULATION="stop simulation";
+    private final String SHOW_TIME="show time";
+    private final String DONTSHOW_TIME="-show time";
+    private final String SWITCH_SHOW_TIME="switch time";
+    private final String SHOW_INFO="show info";
+    private final String DONTSHOW_INFO="-show info";
+
+    private boolean simulationIsStart = false;
+    private boolean showTime = true;
+    private boolean showInfo = true;
+
+
     Habitat habitat;
     int time = 0;
 
@@ -30,8 +43,11 @@ public class Application implements Runnable {
     private JButton startSimulationButton, stopSimulationButton;
     private JLabel timeLabel;
     private ButtonGroup showTimeSimulationGroup;
-    private JRadioButton showTimeSimulation;
-    private JRadioButton dontShowTimeSimulation;
+    private JRadioButton showTimeSimulation, dontShowTimeSimulation;
+    private JCheckBox showInformation;
+    private JTextField tPrivateGenerationField
+                      ,tTenementGenerationField;
+    private JComboBox<Integer> pPrivateGeneration, pTenementGeneration;
 
     private void setStyle(JTextPane textPane){
         head = textPane.addStyle(HEAD_STYLE, null);
@@ -64,18 +80,17 @@ public class Application implements Runnable {
     public void run() {
         f = new JFrame ("Main");
         world = new JPanel();
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel,BoxLayout.PAGE_AXIS));
+        JPanel panelViewSettings = new JPanel();
+        panelViewSettings.setLayout(new BoxLayout(panelViewSettings,BoxLayout.Y_AXIS));
+        JPanel panelGenerationSettings = new JPanel();
+        panelGenerationSettings.setLayout(new BoxLayout(panelGenerationSettings, BoxLayout.Y_AXIS));
 
-        //world.setLocation(0,0);
-       // world.setBounds(0,0,800,600);
         world.setMinimumSize(new Dimension(800,600));
         world.setPreferredSize(new Dimension(800,600));
 
         world.setLayout(null);
         timeLabel = new JLabel("Время: ");
         timeLabel.setLocation(0, 0);
-       // timeLabel.setMinimumSize(new Dimension(100,100));
         timeLabel.setSize(100,20);
         timeLabel.setBorder(new BevelBorder(1));
         world.add(timeLabel);
@@ -143,30 +158,75 @@ public class Application implements Runnable {
             }
         });
         world.setBorder(new BevelBorder(1));
-        f.add(world, BorderLayout.LINE_START);
+        f.add(world, BorderLayout.CENTER);
 
         //ControlPanel created
         startSimulationButton = new JButton("Старт");
-        startSimulationButton.addActionListener(e -> {
-            startSimulation();
-        });
+        startSimulationButton.setActionCommand(START_SIMULATION);
+        startSimulationButton.addActionListener(this);
         stopSimulationButton = new JButton("Стоп");
+        stopSimulationButton.setActionCommand(STOP_SIMULATION);
         stopSimulationButton.setEnabled(false);
-        stopSimulationButton.addActionListener(e -> {
-            stopSimulation();
-        });
+        stopSimulationButton.addActionListener(this);
         showTimeSimulationGroup = new ButtonGroup();
         showTimeSimulation = new JRadioButton("Показывать время",true);
+        showTimeSimulation.setActionCommand(SHOW_TIME);
+        showTimeSimulation.addActionListener(this);
         dontShowTimeSimulation = new JRadioButton("Не показывать время");
+        dontShowTimeSimulation.setActionCommand(DONTSHOW_TIME);
+        dontShowTimeSimulation.addActionListener(this);
+        showInformation = new JCheckBox("Выводить информацию",true);
+        tTenementGenerationField = new JTextField(3);
+
+        tPrivateGenerationField = new JTextField(3);
+        tPrivateGenerationField.setPreferredSize(new Dimension(80,20));
+        //tPrivateGenerationField.setMaximumSize(new Dimension(80,20));
+        pPrivateGeneration = new JComboBox<>();
+        pTenementGeneration = new JComboBox<>();
         showTimeSimulationGroup.add(showTimeSimulation);
         showTimeSimulationGroup.add(dontShowTimeSimulation);
-        panel.add(startSimulationButton);
-        panel.add(stopSimulationButton);
-        panel.add(showTimeSimulation);
-        panel.add(dontShowTimeSimulation);
+        panelViewSettings.add(startSimulationButton);
+        panelViewSettings.add(stopSimulationButton);
+        panelViewSettings.add(showInformation);
+        panelViewSettings.add(showTimeSimulation);
+        panelViewSettings.add(dontShowTimeSimulation);
+        Box privateBox = Box.createHorizontalBox();
+        privateBox.add(new JLabel("Период генерации деревянного дома"));
+        privateBox.add(tPrivateGenerationField);
+        panelGenerationSettings.add(privateBox);
+        panelGenerationSettings.add(tPrivateGenerationField);
+        panelGenerationSettings.add(tTenementGenerationField);
+        panelGenerationSettings.add(pPrivateGeneration);
+        panelGenerationSettings.add(pTenementGeneration);
 
-        f.add(panel, BorderLayout.LINE_END);
+        f.add(panelViewSettings, BorderLayout.WEST);
+        f.add(panelGenerationSettings, BorderLayout.SOUTH);
 
+        //---МЕНЮ---
+        //---Меню генерации---
+        JMenuBar menuBar = new JMenuBar();
+        JMenu generationMenu = new JMenu("Генерация");
+        JMenuItem startItem = new JMenuItem("Старт");
+        startItem.setActionCommand(START_SIMULATION);
+        startItem.addActionListener(this);
+        JMenuItem stopItem = new JMenuItem("Стоп");
+        stopItem.setActionCommand(STOP_SIMULATION);
+        stopItem.addActionListener(this);
+        generationMenu.add(startItem);
+        generationMenu.add(stopItem);
+        menuBar.add(generationMenu);
+
+        //---Меню настроек---
+        JMenu settingsMenu = new JMenu("Настройки");
+        JCheckBoxMenuItem showTimeItem = new JCheckBoxMenuItem("Отображать время",true);
+        showTimeItem.setActionCommand(SWITCH_SHOW_TIME);
+        showTimeItem.addActionListener(this);
+        JCheckBoxMenuItem showInfoItem = new JCheckBoxMenuItem("Отображать информацию");
+        settingsMenu.add(showTimeItem);
+        settingsMenu.add(showInfoItem);
+        menuBar.add(settingsMenu);
+
+        f.setJMenuBar(menuBar);
         f.setSize(1000, 600);
         f.setVisible(true);
     }
@@ -201,5 +261,30 @@ public class Application implements Runnable {
         stopSimulationButton.setEnabled(true);
         world.add(timeLabel);
         f.repaint();
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        switch (e.getActionCommand()){
+            case START_SIMULATION:
+                startSimulation();
+                break;
+            case STOP_SIMULATION:
+                stopSimulation();
+                break;
+            case SHOW_INFO:
+                break;
+            case DONTSHOW_INFO:
+                break;
+            case SHOW_TIME:
+                timeLabel.setVisible(true);
+                break;
+            case DONTSHOW_TIME:
+                timeLabel.setVisible(false);
+                break;
+            case SWITCH_SHOW_TIME:
+                timeLabel.setVisible(!timeLabel.isVisible());
+                break;
+        }
     }
 }
