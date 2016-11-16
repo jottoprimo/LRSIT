@@ -8,7 +8,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -19,10 +18,7 @@ public class Application implements Runnable, ActionListener {
     private final String DONTSHOW_TIME="-show time";
     private final String SWITCH_SHOW_TIME="switch time";
     private final String SWITCH_SHOW_INFO="switch info";
-    private final String DONTSHOW_INFO="-show info";
 
-    private boolean simulationIsStart = false;
-    private boolean showTime = true;
     private boolean showInfo = true;
 
     private HashMap<String, Float> percentToFloat;
@@ -30,8 +26,6 @@ public class Application implements Runnable, ActionListener {
 
     final Color unpressedBtnColor = new Color(0xEEEEEE);
     final Color pressedBtnColor = new Color(0xFFFFFF);
-
-    private Color color;
 
     Habitat habitat;
     int time = 0;
@@ -63,6 +57,9 @@ public class Application implements Runnable, ActionListener {
     private JButton showTimeToolBarBtn;
     private JButton showInfoToolBarBtn;
 
+    public Application() {
+    }
+
     public static void main(String[] args) {
 
         SwingUtilities.invokeLater (new Application());
@@ -76,6 +73,7 @@ public class Application implements Runnable, ActionListener {
         JPanel panelGenerationSettings = new JPanel();
         panelGenerationSettings.setLayout(new FlowLayout(FlowLayout.LEFT));
 
+        //---Среда---
         world.setMinimumSize(new Dimension(800,400));
         world.setPreferredSize(new Dimension(800,400));
 
