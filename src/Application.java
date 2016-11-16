@@ -1,14 +1,16 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
-import javax.swing.text.Document;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Vector;
 
 public class Application implements Runnable, ActionListener {
     private final String START_SIMULATION="start simulation";
@@ -16,26 +18,25 @@ public class Application implements Runnable, ActionListener {
     private final String SHOW_TIME="show time";
     private final String DONTSHOW_TIME="-show time";
     private final String SWITCH_SHOW_TIME="switch time";
-    private final String SHOW_INFO="show info";
+    private final String SWITCH_SHOW_INFO="switch info";
     private final String DONTSHOW_INFO="-show info";
 
     private boolean simulationIsStart = false;
     private boolean showTime = true;
     private boolean showInfo = true;
 
+    private HashMap<String, Float> percentToFloat;
+
+
+    final Color unpressedBtnColor = new Color(0xEEEEEE);
+    final Color pressedBtnColor = new Color(0xFFFFFF);
+
+    private Color color;
 
     Habitat habitat;
     int time = 0;
 
     private HashMap<String, Image> images = new HashMap<>();
-
-    //Для стилей
-    final String HEAD_STYLE = "head";
-    final String PARAM_STYLE = "param";
-    final String VALUE_STYLE = "value";
-    final String FONT_BASE = "Comic Sans MS";
-    final String FONT_VALUE = "Times New Roman";
-    Style head, param, value;
 
     private Timer timer;
     private JPanel world;
@@ -44,33 +45,23 @@ public class Application implements Runnable, ActionListener {
     private JLabel timeLabel;
     private ButtonGroup showTimeSimulationGroup;
     private JRadioButton showTimeSimulation, dontShowTimeSimulation;
-    private JCheckBox showInformation;
+    private JCheckBox showInformationCheckBox;
     private JTextField tPrivateGenerationField
                       ,tTenementGenerationField;
-    private JComboBox<Integer> pPrivateGeneration, pTenementGeneration;
-
-    private void setStyle(JTextPane textPane){
-        head = textPane.addStyle(HEAD_STYLE, null);
-        StyleConstants.setFontFamily(head, FONT_BASE);
-        StyleConstants.setFontSize(head, 16);
-
-        param = textPane.addStyle(PARAM_STYLE, head);
-        StyleConstants.setFontSize(param, 14);
-
-        value = textPane.addStyle(VALUE_STYLE, null);
-        StyleConstants.setFontFamily(value, FONT_VALUE);
-        StyleConstants.setFontSize(value, 14);
-        StyleConstants.setForeground(value, new Color(236, 201, 57));
-    }
-
-    private void insertText(JTextPane textPane, String text, Style style){
-        try {
-            Document doc = textPane.getDocument();
-            doc.insertString(doc.getLength(), text, style);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    private JComboBox pPrivateGeneration;
+    private JList pTenementGeneration;
+    private JMenuBar menuBar;
+    private JMenu generationMenu;
+    private JCheckBoxMenuItem showInfoItem;
+    private JMenuItem startItem;
+    private JCheckBoxMenuItem showTimeItem;
+    private JMenuItem stopItem;
+    private JMenu settingsMenu;
+    private JToolBar toolBar;
+    private JButton startToolBarBtn;
+    private JButton stopToolBarBtn;
+    private JButton showTimeToolBarBtn;
+    private JButton showInfoToolBarBtn;
 
     public static void main(String[] args) {
 
@@ -83,10 +74,10 @@ public class Application implements Runnable, ActionListener {
         JPanel panelViewSettings = new JPanel();
         panelViewSettings.setLayout(new BoxLayout(panelViewSettings,BoxLayout.Y_AXIS));
         JPanel panelGenerationSettings = new JPanel();
-        panelGenerationSettings.setLayout(new BoxLayout(panelGenerationSettings, BoxLayout.Y_AXIS));
+        panelGenerationSettings.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        world.setMinimumSize(new Dimension(800,600));
-        world.setPreferredSize(new Dimension(800,600));
+        world.setMinimumSize(new Dimension(800,400));
+        world.setPreferredSize(new Dimension(800,400));
 
         world.setLayout(null);
         timeLabel = new JLabel("Время: ");
@@ -95,7 +86,7 @@ public class Application implements Runnable, ActionListener {
         timeLabel.setBorder(new BevelBorder(1));
         world.add(timeLabel);
 
-        habitat = new Habitat(800, 600);
+        habitat = new Habitat(800, 400);
         habitat.setCreteHouseListener(house -> {
 
             ImagePanel imagePanel = new ImagePanel();
@@ -112,7 +103,9 @@ public class Application implements Runnable, ActionListener {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
             world.add(imagePanel);
+            Singleton.getInstance().getImages().add(imagePanel);
             f.repaint();
         });
 
@@ -137,18 +130,16 @@ public class Application implements Runnable, ActionListener {
             @Override
             public void keyPressed(KeyEvent e) {
                 // Нажатие на B
-                if (e.getKeyCode()==66) {
-                    timer.start();
-                    world.removeAll();
-                    f.repaint();
+                if (e.getKeyCode() == 66) {
+                    startSimulation();
                 }
                 // Нажатие на E
-                if (e.getKeyCode()==69) {
+                if (e.getKeyCode() == 69) {
                     stopSimulation();
                 }
-
+                // Нажатие на T
                 if (e.getKeyCode() == 84){
-                    timeLabel.setVisible(!timeLabel.isVisible());
+                    setShowTime(!timeLabel.isVisible());
                 }
             }
 
@@ -160,7 +151,7 @@ public class Application implements Runnable, ActionListener {
         world.setBorder(new BevelBorder(1));
         f.add(world, BorderLayout.CENTER);
 
-        //ControlPanel created
+        //---Панель управления отображением---
         startSimulationButton = new JButton("Старт");
         startSimulationButton.setActionCommand(START_SIMULATION);
         startSimulationButton.addActionListener(this);
@@ -175,83 +166,187 @@ public class Application implements Runnable, ActionListener {
         dontShowTimeSimulation = new JRadioButton("Не показывать время");
         dontShowTimeSimulation.setActionCommand(DONTSHOW_TIME);
         dontShowTimeSimulation.addActionListener(this);
-        showInformation = new JCheckBox("Выводить информацию",true);
-        tTenementGenerationField = new JTextField(3);
-
-        tPrivateGenerationField = new JTextField(3);
-        tPrivateGenerationField.setPreferredSize(new Dimension(80,20));
-        //tPrivateGenerationField.setMaximumSize(new Dimension(80,20));
-        pPrivateGeneration = new JComboBox<>();
-        pTenementGeneration = new JComboBox<>();
+        showInformationCheckBox = new JCheckBox("Выводить информацию",showInfo);
+        showInformationCheckBox.addItemListener(e -> {
+            setShowInformation(((JCheckBox) e.getSource()).isSelected());
+        });
         showTimeSimulationGroup.add(showTimeSimulation);
         showTimeSimulationGroup.add(dontShowTimeSimulation);
         panelViewSettings.add(startSimulationButton);
         panelViewSettings.add(stopSimulationButton);
-        panelViewSettings.add(showInformation);
+        panelViewSettings.add(showInformationCheckBox);
         panelViewSettings.add(showTimeSimulation);
         panelViewSettings.add(dontShowTimeSimulation);
-        Box privateBox = Box.createHorizontalBox();
+
+        //---Панель управления симуляцией---
+        percentToFloat = new HashMap<>();
+        for (int i=0;i<11;i++){
+            percentToFloat.put(i*10+"%",i/10.f);
+        }
+
+        tTenementGenerationField = new JTextField("3");
+        tTenementGenerationField.addActionListener(e -> {
+            JTextField field = (JTextField)e.getSource();
+            String text = field.getText();
+            int val=-1;
+            try {
+                val = Integer.parseInt(text);
+            } catch (NumberFormatException ex){
+                field.setText(Integer.toString(habitat.gettTenemnt()));
+                JOptionPane.showMessageDialog(f, "Введено не корректное значение");
+                return;
+            }
+            if (val<=0){
+                field.setText(Integer.toString(habitat.gettTenemnt()));
+                JOptionPane.showMessageDialog(f, "Введено не корректное значение");
+                return;
+            }
+            habitat.settTenemnt(val);
+        });
+        tPrivateGenerationField = new JTextField("1");
+        tPrivateGenerationField.addActionListener(e -> {
+            JTextField field = (JTextField)e.getSource();
+            String text = field.getText();
+            int val=-1;
+            try {
+                val = Integer.parseInt(text);
+            } catch (NumberFormatException ex){
+                field.setText(Integer.toString(habitat.gettPrivate()));
+                JOptionPane.showMessageDialog(f, "Введено не корректное значение");
+                return;
+            }
+            if (val<=0){
+                field.setText(Integer.toString(habitat.gettPrivate()));
+                JOptionPane.showMessageDialog(f, "Введено не корректное значение");
+                return;
+            }
+            habitat.settPrivate(val);
+        });
+        tPrivateGenerationField.setPreferredSize(new Dimension(80,20));
+        Vector<String> percents = new Vector<>(11);
+        for (int i=0;i<11;i++){
+            percents.add(i*10+"%");
+        }
+        pPrivateGeneration = new JComboBox<>(percents);
+        pPrivateGeneration.setSelectedIndex(6);
+        pPrivateGeneration.addItemListener(e -> {
+            String value = (String)((JComboBox)e.getSource()).getSelectedItem();
+            habitat.setpPrivate(percentToFloat.get(value));
+        });
+        pTenementGeneration = new JList<>(percents);
+        pTenementGeneration.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        pTenementGeneration.setSelectedIndex(8);
+        pTenementGeneration.addListSelectionListener(e -> {
+            String value = (String)((JList)e.getSource()).getSelectedValue();
+            habitat.setpTenement(percentToFloat.get(value));
+        });
+
+        Box privateBox = Box.createVerticalBox();
         privateBox.add(new JLabel("Период генерации деревянного дома"));
         privateBox.add(tPrivateGenerationField);
         panelGenerationSettings.add(privateBox);
-        panelGenerationSettings.add(tPrivateGenerationField);
-        panelGenerationSettings.add(tTenementGenerationField);
-        panelGenerationSettings.add(pPrivateGeneration);
-        panelGenerationSettings.add(pTenementGeneration);
+
+        Box tenementBox = Box.createVerticalBox();
+        tenementBox.add(new JLabel("Период генерации капитального дома"));
+        tenementBox.add(tTenementGenerationField);
+        panelGenerationSettings.add(tenementBox);
+
+        Box pPrivateBox = Box.createVerticalBox();
+        pPrivateBox.add(new JLabel("Вероятность генерации деревянного дома"));
+        pPrivateBox.add(pPrivateGeneration);
+        panelGenerationSettings.add(pPrivateBox);
+
+        Box pTenementBox = Box.createVerticalBox();
+        pTenementBox.add(new JLabel("Вероятность генерации капитального дома"));
+        pTenementBox.add(pTenementGeneration);
+        panelGenerationSettings.add(pTenementBox);
+
 
         f.add(panelViewSettings, BorderLayout.WEST);
         f.add(panelGenerationSettings, BorderLayout.SOUTH);
 
         //---МЕНЮ---
-        //---Меню генерации---
-        JMenuBar menuBar = new JMenuBar();
-        JMenu generationMenu = new JMenu("Генерация");
-        JMenuItem startItem = new JMenuItem("Старт");
-        startItem.setActionCommand(START_SIMULATION);
-        startItem.addActionListener(this);
-        JMenuItem stopItem = new JMenuItem("Стоп");
-        stopItem.setActionCommand(STOP_SIMULATION);
-        stopItem.addActionListener(this);
-        generationMenu.add(startItem);
-        generationMenu.add(stopItem);
-        menuBar.add(generationMenu);
+            //---Меню генерации---
+            menuBar = new JMenuBar();
+            generationMenu = new JMenu("Генерация");
+            startItem = new JMenuItem("Старт");
+            startItem.setActionCommand(START_SIMULATION);
+            startItem.addActionListener(this);
+            stopItem = new JMenuItem("Стоп");
+            stopItem.setActionCommand(STOP_SIMULATION);
+            stopItem.addActionListener(this);
+            generationMenu.add(startItem);
+            generationMenu.add(stopItem);
+            menuBar.add(generationMenu);
 
-        //---Меню настроек---
-        JMenu settingsMenu = new JMenu("Настройки");
-        JCheckBoxMenuItem showTimeItem = new JCheckBoxMenuItem("Отображать время",true);
-        showTimeItem.setActionCommand(SWITCH_SHOW_TIME);
-        showTimeItem.addActionListener(this);
-        JCheckBoxMenuItem showInfoItem = new JCheckBoxMenuItem("Отображать информацию");
-        settingsMenu.add(showTimeItem);
-        settingsMenu.add(showInfoItem);
-        menuBar.add(settingsMenu);
+            //---Меню настроек---
+            settingsMenu = new JMenu("Настройки");
+            showTimeItem = new JCheckBoxMenuItem("Отображать время",true);
+            showTimeItem.setActionCommand(SWITCH_SHOW_TIME);
+            showTimeItem.addActionListener(this);
+            showInfoItem = new JCheckBoxMenuItem("Отображать информацию");
+            showInfoItem.addItemListener(e -> {
+                setShowInformation(((JCheckBoxMenuItem) e.getSource()).isSelected());
+            });
+            settingsMenu.add(showTimeItem);
+            settingsMenu.add(showInfoItem);
+            menuBar.add(settingsMenu);
+
+        //---Панель инструментов---
+        toolBar = new JToolBar();
+        startToolBarBtn = new JButton("Start");
+        startToolBarBtn.setActionCommand(START_SIMULATION);
+        startToolBarBtn.addActionListener(this);
+        startToolBarBtn.setBackground(unpressedBtnColor);
+
+        stopToolBarBtn = new JButton("Stop");
+        stopToolBarBtn.setActionCommand(STOP_SIMULATION);
+        stopToolBarBtn.addActionListener(this);
+        stopToolBarBtn.setBackground(unpressedBtnColor);
+
+        showTimeToolBarBtn = new JButton("ST");
+        showTimeToolBarBtn.setActionCommand(SWITCH_SHOW_TIME);
+        showTimeToolBarBtn.addActionListener(this);
+        showTimeToolBarBtn.setBackground(pressedBtnColor);
+
+        showInfoToolBarBtn = new JButton("SI");
+        showInfoToolBarBtn.setActionCommand(SWITCH_SHOW_INFO);
+        showInfoToolBarBtn.addActionListener(this);
+        showInfoToolBarBtn.setBackground(pressedBtnColor);
+
+        toolBar.add(startToolBarBtn);
+        toolBar.add(stopToolBarBtn);
+        toolBar.add(showTimeToolBarBtn);
+        toolBar.add(showInfoToolBarBtn);
+        f.add(toolBar,BorderLayout.NORTH);
 
         f.setJMenuBar(menuBar);
         f.setSize(1000, 600);
         f.setVisible(true);
+        f.setFocusable(true);
+    }
+
+    private void setShowInformation(boolean showInformation) {
+        showInfo = showInformation;
+        showInformationCheckBox.setSelected(showInformation);
+        showInfoItem.setSelected(showInformation);
+        if (showInfo) showInfoToolBarBtn.setBackground(pressedBtnColor);
+        else showInfoToolBarBtn.setBackground(unpressedBtnColor);
     }
 
     private void stopSimulation() {
         timer.stop();
-        JTextPane report = new JTextPane();
-        setStyle(report);
-        insertText(report, "Отчет симуляии\n", head);
-        HashMap<String, Integer> dataReport = habitat.getHousesReport();
-        report.setSize(600,100);
-        report.setEditable(false);
-        report.setBackground(new Color(227, 228, 254));
-        report.setLocation(100,100);
-        for (String key: dataReport.keySet()){
-            insertText(report, key+": ", param);
-            insertText(report, dataReport.get(key).toString()+"\n", value);
-        }
-        insertText(report, "Время: ", param);
-        insertText(report, String.valueOf(time), value);
-        world.add(report);
-        habitat.ClearList();
-        stopSimulationButton.setEnabled(false);
-        startSimulationButton.setEnabled(true);
-        time = 0;
+
+        if (!showInfo || showInfoDialog()) {
+            habitat.ClearList();
+            stopSimulationButton.setEnabled(false);
+            startSimulationButton.setEnabled(true);
+            stopItem.setEnabled(false);
+            startItem.setEnabled(true);
+            startToolBarBtn.setEnabled(true);
+            stopToolBarBtn.setEnabled(false);
+            time = 0;
+        } else timer.start();
     }
 
     private void startSimulation(){
@@ -259,8 +354,37 @@ public class Application implements Runnable, ActionListener {
         world.removeAll();
         startSimulationButton.setEnabled(false);
         stopSimulationButton.setEnabled(true);
+        startItem.setEnabled(false);
+        stopItem.setEnabled(true);
         world.add(timeLabel);
+        startToolBarBtn.setEnabled(false);
+        stopToolBarBtn.setEnabled(true);
         f.repaint();
+    }
+
+    private void setShowTime(boolean show){
+        timeLabel.setVisible(show);
+        showTimeItem.setState(show);
+
+        if (show) {
+            showTimeSimulation.setSelected(true);
+            showTimeToolBarBtn.setBackground(pressedBtnColor);
+        }
+        else {
+            dontShowTimeSimulation.setSelected(true);
+            showTimeToolBarBtn.setBackground(unpressedBtnColor);
+        }
+    }
+
+    private boolean showInfoDialog(){
+        HashMap<String, Integer> dataReport = habitat.getHousesReport();
+        StringBuilder reportText = new StringBuilder();
+        for (String key : dataReport.keySet()) {
+            reportText.append(key + ": " + dataReport.get(key) + "\n");
+        }
+        ReportDialog dialog = new ReportDialog(f, reportText.toString());
+        dialog.setVisible(true);
+        return dialog.getResult();
     }
 
     @Override
@@ -272,18 +396,17 @@ public class Application implements Runnable, ActionListener {
             case STOP_SIMULATION:
                 stopSimulation();
                 break;
-            case SHOW_INFO:
-                break;
-            case DONTSHOW_INFO:
-                break;
             case SHOW_TIME:
-                timeLabel.setVisible(true);
+                setShowTime(true);
                 break;
             case DONTSHOW_TIME:
-                timeLabel.setVisible(false);
+                setShowTime(false);
                 break;
             case SWITCH_SHOW_TIME:
-                timeLabel.setVisible(!timeLabel.isVisible());
+                setShowTime(!timeLabel.isVisible());
+                break;
+            case SWITCH_SHOW_INFO:
+                setShowInformation(!showInfo);
                 break;
         }
     }
