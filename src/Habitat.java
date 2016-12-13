@@ -1,90 +1,115 @@
-import java.awt.*;
+import javax.swing.*;
+import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedReader;
+import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.nio.channels.Pipe;
 import java.util.*;
 
 /**
  * Created by Evgenij on 15.10.2016.
  */
-public class Habitat {
-    private ArrayList<House> houses;
-    private ICreateHouseListener listener;
-    private float pTenement, pPrivate;
-    private int tTenemnt, tPrivate;
-    private int width, height;
+public class Habitat implements Serializable {
+    private Properties properties;
+    private IHabitatListener listener;
     private ConcreteFactory factory;
     private Random random;
+    private PrivateHouseAI privateAI;
+    private TenementHouseAI tenementAI;
+    private PipedReader inPipe;
+    private PipedReader inPipeTenement;
+    private boolean privateSleep;
+    private boolean tenementSleep;
 
-    public Habitat(int width, int height){
-        houses = new ArrayList<>();
+    private int width, height;
+
+    public Habitat(){
+        random = new Random(System.currentTimeMillis());
+        properties = new Properties();
+    }
+
+    public Habitat(int width, int height) throws IOException {
+        this();
         this.width = width;
         this.height = height;
         factory = new ConcreteFactory(width, height);
-        random = new Random(System.currentTimeMillis());
-        tTenemnt = 3;
-        tPrivate = 1;
-        pTenement = 0.8f;
-        pPrivate = 0.6f;
+
+
+        inPipe = null;
+        privateAI = new PrivateHouseAI(width, height, 5);
+        tenementAI = new TenementHouseAI(width, height, 5);
+        privateSleep = false;
+        tenementSleep = false;
     }
 
     public float getpTenement() {
-        return pTenement;
+        return properties.getpTenement();
     }
 
     public void setpTenement(float pTenement) {
-        this.pTenement = pTenement;
+        properties.setpTenement(pTenement);
     }
 
     public float getpPrivate() {
-        return pPrivate;
+        return properties.getpPrivate();
     }
 
     public void setpPrivate(float pPrivate) {
-        this.pPrivate = pPrivate;
+        properties.setpPrivate(pPrivate);
     }
 
     public int gettTenemnt() {
-        return tTenemnt;
+        return properties.gettTenemnt();
     }
 
     public void settTenemnt(int tTenemnt) {
-        this.tTenemnt = tTenemnt;
+         properties.settTenemnt(tTenemnt);
     }
 
     public int gettPrivate() {
-        return tPrivate;
+        return properties.gettPrivate();
     }
 
     public void settPrivate(int tPrivate) {
-        this.tPrivate = tPrivate;
+        properties.settPrivate(tPrivate);
     }
 
     public void Update(int time){
         House house;
-        if (time % tTenemnt == 0) {
-            if (random.nextFloat()<pTenement) {
-                house = factory.CreateTenementHouse();
-                houses.add(house);
-                listener.onCreateHouse(house);
+
+        synchronized (Singleton.getInstance()) {
+            ArrayList<House> houses = Singleton.getInstance().getHouses();
+            if (time % properties.gettTenemnt()== 0) {
+                if (random.nextFloat() < properties.getpTenement()) {
+                    house = factory.CreateTenementHouse();
+                    houses.add(house);
+
+                    listener.onCreateHouse(house);
+                }
             }
-        }
-        if (time % tPrivate == 0) {
-            if (random.nextFloat()<pPrivate) {
-                house = factory.CreatePrivateHouse();
-                houses.add(house);
-                listener.onCreateHouse(house);
+            if (time % properties.gettPrivate() == 0) {
+                if (random.nextFloat() < properties.getpPrivate()) {
+                    house = factory.CreatePrivateHouse();
+                    houses.add(house);
+
+                    listener.onCreateHouse(house);
+                }
             }
         }
     }
 
     public void ClearList(){
-        houses.clear();
+        Singleton.getInstance().getHouses().clear();
     }
 
-    public void setCreteHouseListener(ICreateHouseListener listener){
+    public void setCreteHouseListener(IHabitatListener listener){
         this.listener = listener;
     }
 
     public HashMap<String, Integer> getHousesReport(){
         HashMap <String, Integer> report = new HashMap<>();
+        ArrayList<House> houses = Singleton.getInstance().getHouses();
         for (House house: houses) {
             String houseType = house.getObjectName();
             if (!report.containsKey(houseType)){
@@ -98,5 +123,101 @@ public class Habitat {
         return report;
     }
 
+    public void start(){
+        try {
+            inPipe = new PipedReader();
+            inPipeTenement = new PipedReader();
+            privateAI.setPipe(inPipe);
+            tenementAI.setPipe(inPipeTenement);
+            privateAI.start();
+            tenementAI.start();
+            int pipeCmd =0;
+            char[] buffer = new char[1];
+           // System.out.println("---MAIN: "+pipeCmd);
+            while (pipeCmd != -1) {
+                Thread.sleep(30);
+                if (!privateSleep)
+                {
+                   // synchronized (inPipe){
+                        try {
+                            inPipe.read(buffer);
+                            System.out.println("Pri "+buffer[0]);
+                            pipeCmd = Integer.parseInt(String.valueOf(buffer[0]));
+                            if (pipeCmd == 1 && listener != null) {
+                                listener.onRedraw();
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    //}
+                }
+                if (!tenementSleep) {
+                    //synchronized (inPipeTenement) {
+                        try {
+                            inPipeTenement.read(buffer);
+                            //System.out.println("Ten: "+String.copyValueOf(buffer));
+                            System.out.println("Ten "+buffer[0]);
+                            pipeCmd = Integer.parseInt(String.valueOf(buffer[0]));
+                            if (pipeCmd == 1 && listener != null) {
+                                listener.onRedraw();
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                   // }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 
+    public void setTenementPriority(int priority) {
+        if (tenementAI==null) return;
+        tenementAI.setPriority(priority);
+    }
+
+    public void setPrivatePriority(int priority) {
+        if (privateAI==null) return;
+        privateAI.setPriority(priority);
+    }
+
+    public void wakeUpPrivate() {
+
+        synchronized (inPipe) {
+            inPipe.notifyAll();
+            privateSleep = false;
+        }
+    }
+
+    public void sleepPrivate() {
+        synchronized (inPipe) {
+            privateSleep = true;
+            privateAI.stoped(true);
+        }
+    }
+
+    public void wakeUpTenement() {
+        synchronized (inPipeTenement) {
+            inPipeTenement.notifyAll();
+            tenementSleep = false;
+        }
+    }
+
+    public void sleepTenement() {
+        synchronized (inPipeTenement) {
+            tenementSleep = true;
+            tenementAI.stoped(true);
+        }
+    }
+
+    public Properties getProperties(){
+        return properties;
+    }
+
+    public void setProperties(Properties properties){
+        this.properties = properties;
+    }
 }

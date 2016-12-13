@@ -22,4 +22,16 @@ public class TenementHouse extends House implements IBehaviour {
     public String getObjectName() {
         return "Капитальный дом";
     }
+
+    @Override
+    public void goTo(int toX, int toY, double v) {
+        if (toX==-1 || toY==-1) return;
+        double len = Math.sqrt(Math.pow(x-toX,2)+Math.pow(y-toY,2));
+        if (len<=v) return;
+        double dx = v*(toX-x)/len;
+        double dy = v*(toY-y)/len;
+
+        x+=dx;
+        y+=dy;
+    }
 }
