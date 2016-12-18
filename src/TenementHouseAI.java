@@ -44,7 +44,7 @@ public class TenementHouseAI extends BaseAI {
     public void run(){
         ByteBuffer buffer = ByteBuffer.allocate(64);
         buffer.clear();
-        while (!interrupted()){
+        while (!interrupt){
             try {
                 sleep(30);
             } catch (InterruptedException e) {
@@ -56,7 +56,7 @@ public class TenementHouseAI extends BaseAI {
                 step();
                 try {
                     outPipe.write("1");
-                    inPipe.notifyAll();
+                    //inPipe.notifyAll();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -72,5 +72,11 @@ public class TenementHouseAI extends BaseAI {
             }
 
         }
+        try {
+            outPipe.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("END TENEMENT");
     }
 }

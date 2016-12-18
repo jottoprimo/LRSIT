@@ -138,10 +138,9 @@ public class Habitat implements Serializable {
                 Thread.sleep(30);
                 if (!privateSleep)
                 {
-                   // synchronized (inPipe){
+                    synchronized (inPipe){
                         try {
                             inPipe.read(buffer);
-                            System.out.println("Pri "+buffer[0]);
                             pipeCmd = Integer.parseInt(String.valueOf(buffer[0]));
                             if (pipeCmd == 1 && listener != null) {
                                 listener.onRedraw();
@@ -149,14 +148,12 @@ public class Habitat implements Serializable {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    //}
+                    }
                 }
                 if (!tenementSleep) {
-                    //synchronized (inPipeTenement) {
+                    synchronized (inPipeTenement) {
                         try {
                             inPipeTenement.read(buffer);
-                            //System.out.println("Ten: "+String.copyValueOf(buffer));
-                            System.out.println("Ten "+buffer[0]);
                             pipeCmd = Integer.parseInt(String.valueOf(buffer[0]));
                             if (pipeCmd == 1 && listener != null) {
                                 listener.onRedraw();
@@ -164,7 +161,7 @@ public class Habitat implements Serializable {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                   // }
+                    }
                 }
             }
         } catch (IOException e) {
@@ -219,5 +216,16 @@ public class Habitat implements Serializable {
 
     public void setProperties(Properties properties){
         this.properties = properties;
+    }
+
+    public void interrupt(){
+        synchronized (inPipe){
+            inPipe.notifyAll();
+        }
+        synchronized (inPipeTenement){
+            inPipeTenement.notifyAll();
+        }
+        privateAI.setInterrupt(true);
+        tenementAI.setInterrupt(true);
     }
 }

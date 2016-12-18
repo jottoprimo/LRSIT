@@ -48,7 +48,7 @@ public class PrivateHouseAI extends BaseAI {
     public void run(){
         ByteBuffer buffer = ByteBuffer.allocate(64);
         buffer.clear();
-        while (!interrupted()){
+        while (!interrupt){
             try {
                 sleep(30);
             } catch (InterruptedException e) {
@@ -75,5 +75,11 @@ public class PrivateHouseAI extends BaseAI {
             }
 
         }
+        try {
+            outPipe.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("END PRIVATE");
     }
 }

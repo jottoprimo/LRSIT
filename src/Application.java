@@ -105,6 +105,12 @@ public class Application implements Runnable, ActionListener {
     public void run() {
 
             f = new JFrame("Main");
+        f.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                habitat.interrupt();
+            }
+        });
             world = new JPanel();
             JPanel panelViewSettings = new JPanel();
             panelViewSettings.setLayout(new BoxLayout(panelViewSettings, BoxLayout.Y_AXIS));

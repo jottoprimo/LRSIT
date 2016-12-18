@@ -12,6 +12,7 @@ abstract public class BaseAI extends Thread {
     Thread parentThread;
     PipedReader inPipe;
     PipedWriter outPipe;
+    boolean interrupt = false;
     boolean stop = false;
 
     public void stoped(boolean stop){
@@ -72,5 +73,9 @@ abstract public class BaseAI extends Thread {
         this.inPipe = pipe;
         outPipe = new PipedWriter(pipe);
 
+    }
+
+    public void setInterrupt(boolean interrupt){
+        this.interrupt = interrupt;
     }
 }
